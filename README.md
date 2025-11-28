@@ -152,3 +152,7 @@ fastapi-ecommerce/
 ├── requirements.txt      # Python dependencies
 └── README.md
 
+## Screenshots
+
+<img width="1920" height="1080" alt="Screenshot 2025-11-28 103736" src="https://github.com/user-attachments/assets/6260dbda-2122-45f3-b4b2-4e20f340260e" />
+<img width="1920" height="1080" alt="Screenshot 2025-11-28 103746" src="https://github.com/user-attachments/assets/8d296bfd-99e7-4bb5-8fc1-c1a69037df57" />
