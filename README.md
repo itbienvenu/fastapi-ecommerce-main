@@ -151,6 +151,7 @@ fastapi-ecommerce/
 ├── Dockerfile
 ├── requirements.txt      # Python dependencies
 └── README.md
+```
 
 ## Screenshots
 
