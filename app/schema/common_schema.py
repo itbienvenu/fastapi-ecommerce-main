@@ -31,3 +31,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     links: Optional[PaginationLinks] = Field(
         None, description="HATEOAS links for navigation"
     )
+
+
+class FileUploadResponse(BaseModel):
+    url: str

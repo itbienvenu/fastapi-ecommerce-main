@@ -25,6 +25,13 @@ class RootResponse(BaseModel):
     message: str
 
 
+from fastapi.staticfiles import StaticFiles
+import os
+
+# Create uploads directory if it doesn't exist
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+
 app = FastAPI(
     # --- Metadata for Documentation (Title and Description are crucial) ---
     lifespan=lifespan,
@@ -82,6 +89,7 @@ app = FastAPI(
 )
 
 app.add_middleware(LoggingMiddleware)
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 
 @app.exception_handler(RequestValidationError)

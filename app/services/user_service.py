@@ -9,7 +9,9 @@ from app.models.user import User
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.crud.user import UserCrud
-from app.utils.security import verify_password, create_token
+from datetime import timedelta
+from app.core.config import settings
+from app.utils.security import verify_password, create_token, decode_access_token, TokenError
 
 
 class UserService:
@@ -93,7 +95,44 @@ class UserService:
             )
         access_token_payload = {"sub": str(user.id)}
         access_token = create_token(data=access_token_payload)
-        return TokenSchema(token=access_token, token_type="Bearer")
+
+        refresh_token_payload = {"sub": str(user.id), "type": "refresh"}
+        refresh_expires = timedelta(days=settings.JWT_REFRESH_EXP_DAYS)
+        refresh_token = create_token(
+            data=refresh_token_payload, expiration=refresh_expires
+        )
+
+        return TokenSchema(
+            token=access_token, refresh_token=refresh_token, token_type="Bearer"
+        )
+
+    def refresh_token(self, refresh_token: str) -> TokenSchema:
+        try:
+            payload = decode_access_token(refresh_token)
+            
+            # Verify it's a refresh token
+            if payload.get("type") != "refresh":
+                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+            
+            user_id = payload.get("sub")
+            if not user_id:
+                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject")
+            
+            # Check if user exists (and still active)
+            user = self.get_user_by_id(int(user_id))
+            
+            # Rotate tokens
+            access_token_payload = {"sub": str(user_id)}
+            access_token = create_token(data=access_token_payload)
+            
+            new_refresh_payload = {"sub": str(user_id), "type": "refresh"}
+            refresh_expires = timedelta(days=settings.JWT_REFRESH_EXP_DAYS)
+            new_refresh_token = create_token(data=new_refresh_payload, expiration=refresh_expires)
+            
+            return TokenSchema(token=access_token, refresh_token=new_refresh_token, token_type="Bearer")
+            
+        except TokenError as e:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
     def get_user_by_id(self, id: int) -> User:
         """

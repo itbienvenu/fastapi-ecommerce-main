@@ -32,6 +32,7 @@ class LoginSchema(BaseModel):
 
 class TokenSchema(BaseModel):
     token: str
+    refresh_token: str
     token_type: str
 
 
@@ -60,3 +61,7 @@ class UpdateUserSchema(BaseModel):
 
 class DeleteUserResponseModel(BaseModel):
     detail: str
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

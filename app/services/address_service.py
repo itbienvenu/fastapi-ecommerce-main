@@ -22,7 +22,9 @@ class AddressService:
     ) -> AddressPublic:
         address = self.crud.get_single_address(address_id)
         if not address:
-            raise HTTPException(status_code=s, detail="Address not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Address not found"
+            )
         update_address_data = address_data.model_dump(exclude_unset=True)
         try:
             if update_address_data.get("is_default"):
@@ -34,4 +36,19 @@ class AddressService:
             return AddressPublic.model_validate(address)
 
         except Exception as e:
-            raise HTTPException(status_code=400, detail=e.errors())
+            if isinstance(e, HTTPException):
+                raise e
+            raise HTTPException(status_code=400, detail=str(e))
+
+    def delete_address(self, user_id: int, address_id: int):
+        address = self.crud.get_single_address(address_id)
+        if not address:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Address not found"
+            )
+        if address.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete this address",
+            )
+        self.crud.delete_address(address_id)

@@ -1,6 +1,7 @@
 from app.schema.address_schema import AddressCreate, AddressUpdate, AddressPublic
 from app.services.address_service import AddressService
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from app.services.email_service import EmailService
 from app.services.user_service import UserService
 from app.schema.user_schema import (
     CreateUserSchema,
@@ -9,6 +10,7 @@ from app.schema.user_schema import (
     UserPublic,
     UpdateUserSchema,
     DeleteUserResponseModel,
+    RefreshTokenRequest,
 )
 from app.dependencies import (
     get_user_service_dep,
@@ -22,8 +24,9 @@ router = APIRouter(tags=["User"])
 user_dependency = Annotated[UserService, Depends(get_user_service_dep)]
 address_dependency = Annotated[
     AddressService, Depends(get_address_service_dep)
-]  # Note: Fixed typo from 'depedency' to 'dependency'
+]
 
+email_service = EmailService()
 
 @router.post(
     "/register",
@@ -34,6 +37,7 @@ address_dependency = Annotated[
 async def create_user(
     create_user_data: CreateUserSchema,
     user_service: user_dependency,
+    background_tasks: BackgroundTasks,
 ) -> UserPublic:
     """
     Register a new user and return the public profile.
@@ -44,6 +48,7 @@ async def create_user(
     Parameters:
     - create_user_data (CreateUserSchema): The data required to create a new user, such as username, email, and password.
     - user_service (UserService): Dependency-injected service for user operations.
+    - background_tasks (BackgroundTasks): Task handler for sending emails asynchronously.
 
     Returns:
     - UserPublic: The public profile of the newly created user.
@@ -52,6 +57,7 @@ async def create_user(
     - HTTPException: If validation fails or a conflict occurs (e.g., duplicate email).
     """
     user = user_service.create_user(create_user_data)
+    background_tasks.add_task(email_service.send_welcome_email, user)
     return user
 
 
@@ -81,6 +87,21 @@ async def login(
     - HTTPException: If credentials are invalid (e.g., 401 Unauthorized).
     """
     return user_service.login(user_login_data=user_login_data)
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenSchema,
+    summary="Refresh Token",
+    description="Get new access token using refresh token.",
+)
+async def refresh_token(
+    request: RefreshTokenRequest, user_service: user_dependency
+) -> TokenSchema:
+    """
+    Refresh access token.
+    """
+    return user_service.refresh_token(refresh_token=request.refresh_token)
 
 
 @router.get(
@@ -246,3 +267,35 @@ async def update_address(
 
     address = address_service.update_address(address_id, address_data)
     return address
+
+
+@router.delete(
+    "/me/address/{address_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete address",
+    description="Delete an existing address for the current user.",
+)
+async def delete_address_from_user(
+    current_user: Annotated[UserPublic, Depends(get_current_user)],
+    address_service: address_dependency,
+    address_id: int,
+):
+    """
+    Delete an existing address associated with the currently authenticated user.
+
+    This endpoint removes the specified address. The user must own the address to delete it.
+
+    Parameters:
+    - current_user (UserPublic): The authenticated user object, injected via dependency.
+    - address_service (AddressService): Dependency-injected service for address operations.
+    - address_id (int): The ID of the address to delete.
+
+    Returns:
+    - None: 204 No Content on success.
+
+    Raises:
+    - HTTPException: If the address is not found (404 Not Found),
+      or the user lacks permission (403 Forbidden).
+    """
+    address_service.delete_address(user_id=current_user.id, address_id=address_id)
+    return None
